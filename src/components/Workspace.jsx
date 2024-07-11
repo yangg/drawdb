@@ -21,6 +21,7 @@ import FloatingControls from "./FloatingControls";
 import { Modal } from "@douyinfe/semi-ui";
 import { useTranslation } from "react-i18next";
 import { databases } from "../data/databases";
+import { getDiagram, saveDiagram } from "../data/api.js";
 
 export default function WorkSpace() {
   const [id, setId] = useState(0);
@@ -31,7 +32,7 @@ export default function WorkSpace() {
   const [showSelectDbModal, setShowSelectDbModal] = useState(false);
   const [selectedDb, setSelectedDb] = useState("");
   const { layout } = useLayout();
-  const { settings } = useSettings();
+  const { settings, setSettings } = useSettings();
   const { types, setTypes } = useTypes();
   const { areas, setAreas } = useAreas();
   const { tasks, setTasks } = useTasks();
@@ -57,6 +58,25 @@ export default function WorkSpace() {
   };
 
   const save = useCallback(async () => {
+    if(location.search) {
+      await saveDiagram({
+        name: title,
+        lastModified: new Date(),
+        tables,
+        relationships,
+        notes: notes,
+        areas: areas,
+        todos: tasks,
+        zoom: transform.zoom,
+        pan: transform.pan,
+        ...(databases[database].hasEnums && { enums: enums }),
+        ...(databases[database].hasTypes && { types: types }),
+        tableWidth: settings.tableWidth
+      })
+      setSaveState(State.SAVED);
+      setLastSaved(new Date().toLocaleString());
+      return
+    }
     const name = window.name.split(" ");
     const op = name[0];
     const saveAsDiagram = window.name === "" || op === "d" || op === "lt";
@@ -144,6 +164,7 @@ export default function WorkSpace() {
     setSaveState,
     database,
     enums,
+    settings.tableWidth
   ]);
 
   const load = useCallback(async () => {
@@ -261,7 +282,41 @@ export default function WorkSpace() {
         });
     };
 
-    if (window.name === "") {
+    if(location.search) {
+      const diagram = await getDiagram();
+      if(diagram) {
+        console.log('diagram', diagram)
+        if (diagram.database) {
+          setDatabase(diagram.database);
+        } else {
+          setDatabase(DB.GENERIC);
+        }
+        setId(diagram.id);
+        setTitle(diagram.title);
+        setTables(diagram.tables);
+        setRelationships(diagram.relationships);
+        setAreas(diagram.subjectAreas);
+        setTasks(diagram.todos ?? []);
+        setNotes(diagram.notes);
+        setTransform({
+          zoom: diagram.zoom || 1,
+          pan: diagram.pan || { x: 0, y: 0 },
+        });
+        setUndoStack([]);
+        setRedoStack([]);
+        if (databases[database].hasTypes) {
+          setTypes(diagram.types ?? []);
+        }
+        if (databases[database].hasEnums) {
+          setEnums(diagram.enums ?? []);
+        }
+        if(diagram.tableWidth) {
+          setSettings((prev) => ({ ...prev, tableWidth: diagram.tableWidth }));
+        }
+      } else {
+        console.error("Diagram not found")
+      }
+    } else if (window.name === "") {
       loadLatestDiagram();
     } else {
       const name = window.name.split(" ");

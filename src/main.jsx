@@ -10,6 +10,6 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <LocaleProvider locale={en_US}>
     <App />
-    <Analytics />
+    {/*<Analytics />*/}
   </LocaleProvider>,
 );
